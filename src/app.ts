@@ -14,6 +14,9 @@ export const APP_OPEN_URL = 'https://appconty.com/app/open'
 const LINK_PARAM: Record<Source, 'cid' | 'ref'> = { campaign: 'cid', community: 'cid', referral: 'ref' }
 const ID = /^[\w-]{1,64}$/
 const isId = (v: unknown): v is string => typeof v === 'string' && ID.test(v)
+/** ISO 8601 with date, time and explicit offset, so the server time zone never changes the instant. */
+const isIsoInstant = (v: unknown): v is string =>
+  typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/.test(v)
 
 const fail = (reply: FastifyReply, status: number, error: string) => reply.code(status).send({ error })
 
@@ -78,7 +81,7 @@ export function buildApp({ clock, store = new MemoryStore(), windowDays = WINDOW
     if (existing) return reply.code(200).send(existing)
 
     const now = clock.now()
-    const signedUpAt = signed_up_at === undefined ? now : new Date(typeof signed_up_at === 'string' ? signed_up_at : NaN)
+    const signedUpAt = signed_up_at === undefined ? now : new Date(isIsoInstant(signed_up_at) ? signed_up_at : NaN)
     if (Number.isNaN(signedUpAt.getTime()) || signedUpAt > now) {
       return fail(reply, 400, 'signed_up_at deve ser data ISO 8601 que não esteja no futuro')
     }
@@ -90,7 +93,9 @@ export function buildApp({ clock, store = new MemoryStore(), windowDays = WINDOW
       touches: store.touchesOf(device_id),
     })
     const signup = { user_id, device_id, signed_up_at: signedUpAt, decided_at: now, ...decision }
-    store.saveSignup(signup, decision.touches.filter((t) => t.reason_code !== 'already_used').map((t) => t.click_id))
+    // Touches that competed are used up; a touch after this signup stays free for a later signup on the device.
+    const competed = decision.touches.filter((t) => t.reason_code !== 'already_used' && t.reason_code !== 'after_signup')
+    store.saveSignup(signup, competed.map((t) => t.click_id))
     return reply.code(201).send(signup)
   })
 

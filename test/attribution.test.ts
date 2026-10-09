@@ -86,6 +86,11 @@ describe('decideOrigin: janela e cadastro', () => {
     expect(d.touches[0].outcome).toBe('won')
   })
 
+  it('a janela limita o toque, não o cadastro: toque do dia 1 vence cadastro feito no dia 30', () => {
+    const d = decide([touch('c-cedo', 'campaign', day(1))], day(30))
+    expect(d.origin.click_id).toBe('c-cedo')
+  })
+
   it('toque posterior ao cadastro não vence', () => {
     const d = decide([touch('c-antes', 'community', day(1)), touch('c-depois', 'referral', day(3))], day(2))
 

@@ -64,7 +64,7 @@ export class MemoryStore implements Store {
     this.touches.set(touch.click_id, touch)
   }
 
-  // ponytail: full scan; a real database indexes touches by device_id.
+  // Full scan; a real database indexes touches by device_id.
   touchesOf(device_id: string) {
     return [...this.touches.values()].filter((t) => t.device_id === device_id)
   }

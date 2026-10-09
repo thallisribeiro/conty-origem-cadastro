@@ -160,10 +160,27 @@ describe('API: cadastro e auditoria', () => {
     await firstOpen('dev-1')
     expect((await signup('user-1', 'dev-1', day(1).toISOString())).statusCode).toBe(400)
     expect((await signup('user-1', 'dev-1', 'ontem')).statusCode).toBe(400)
+    expect((await signup('user-1', 'dev-1', '1')).statusCode).toBe(400)
+    expect((await signup('user-1', 'dev-1', '2026-10-01')).statusCode).toBe(400)
   })
 })
 
 describe('API: o mesmo clique não cria duas origens', () => {
+  it('mesmo link aberto duas vezes: dois click_id, dois toques na auditoria e uma origem só', async () => {
+    const { at, click, firstOpen, open, signup } = setup()
+    await firstOpen('dev-1')
+    const primeiro = await click('src=campaign&cid=black-friday-2026')
+    await open('dev-1', primeiro)
+    at(day(1))
+    const segundo = await click('src=campaign&cid=black-friday-2026')
+    await open('dev-1', segundo)
+
+    const body = (await signup('user-1', 'dev-1')).json()
+    expect(segundo).not.toBe(primeiro)
+    expect(body.origin).toMatchObject({ source: 'campaign', campaign_id: 'black-friday-2026', click_id: segundo })
+    expect(body.touches.map((t: { reason_code: string }) => t.reason_code)).toEqual(['lost_to_later', 'won'])
+  })
+
   it('o mesmo clique reportado duas vezes pelo app cria um toque só', async () => {
     const { at, click, firstOpen, open, signup } = setup()
     await firstOpen('dev-1')
@@ -202,6 +219,18 @@ describe('API: o mesmo clique não cria duas origens', () => {
     expect(segundo.origin.source).toBe('organic')
     expect(segundo.reason_code).toBe('all_touches_already_used')
     expect(segundo.touches[0]).toMatchObject({ click_id: c, outcome: 'lost', reason: 'já considerado no cadastro user-1' })
+  })
+
+  it('toque posterior a um cadastro não fica preso a ele e pode ser a origem do próximo cadastro no aparelho', async () => {
+    const { at, click, firstOpen, open, signup } = setup()
+    await firstOpen('dev-1')
+    at(day(3))
+    const c = await click('src=referral&ref=ana')
+    await open('dev-1', c)
+    expect((await signup('user-1', 'dev-1', day(2).toISOString())).json().touches[0].reason_code).toBe('after_signup')
+
+    const segundo = (await signup('user-2', 'dev-1')).json()
+    expect(segundo.origin.click_id).toBe(c)
   })
 
   it('cadastro repetido com o mesmo user_id devolve a decisão gravada, sem decidir de novo', async () => {
