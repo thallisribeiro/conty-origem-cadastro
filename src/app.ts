@@ -90,7 +90,7 @@ export function buildApp({ clock, store = new MemoryStore(), windowDays = WINDOW
       touches: store.touchesOf(device_id),
     })
     const signup = { user_id, device_id, signed_up_at: signedUpAt, decided_at: now, ...decision }
-    store.saveSignup(signup, decision.touches.filter((t) => !t.used_by).map((t) => t.click_id))
+    store.saveSignup(signup, decision.touches.filter((t) => t.reason_code !== 'already_used').map((t) => t.click_id))
     return reply.code(201).send(signup)
   })
 

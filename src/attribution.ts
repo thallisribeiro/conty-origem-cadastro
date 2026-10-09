@@ -38,7 +38,8 @@ export type TouchReasonCode =
   | 'outside_window'
   | 'already_used'
 
-export interface JudgedTouch extends Touch {
+/** used_by is left out: in a frozen decision it would only show the state before this signup. */
+export interface JudgedTouch extends Omit<Touch, 'used_by'> {
   outcome: 'won' | 'lost'
   reason_code: TouchReasonCode
   reason: string
@@ -122,9 +123,10 @@ export function decideOrigin(input: {
     return ['lost_tie_click_id', `empate de horário e de canal com ${w.click_id}: vence o menor click_id`]
   }
 
-  const judged = touches.map((t): JudgedTouch => {
-    if (t === winner) return { ...t, outcome: 'won', reason_code: 'won', reason: `venceu: ${ORIGIN_REASON.last_touch_in_window}` }
-    const [reason_code, reason] = ineligible(t) ?? lostTo(t, winner!)
+  const judged = touches.map((touch): JudgedTouch => {
+    const { used_by, ...t } = touch
+    if (touch === winner) return { ...t, outcome: 'won', reason_code: 'won', reason: `venceu: ${ORIGIN_REASON.last_touch_in_window}` }
+    const [reason_code, reason] = ineligible(touch) ?? lostTo(touch, winner!)
     return { ...t, outcome: 'lost', reason_code, reason }
   })
 
